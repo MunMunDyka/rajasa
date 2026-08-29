@@ -1,7 +1,10 @@
 import type { Prisma, ProjectStatus, UserRole } from "@prisma/client"
 
 import { DEADLINE_WARNING_DAYS, STALE_PROGRESS_DAYS } from "@/config/app"
+import { DEFAULT_REQUIREMENT_TEMPLATE } from "@/config/requirement-templates"
 import { prisma } from "@/server/db/prisma"
+
+import { recordActivity } from "./activity-service"
 
 /**
  * Project queries.
@@ -311,5 +314,213 @@ export async function getDashboardProjectData(
     projects: matching.slice(0, DASHBOARD_PROJECT_LIMIT),
     matchCount: matching.length,
     filtered,
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Creating projects
+// ---------------------------------------------------------------------------
+
+export type ProjectAdminErrorCode =
+  | "FORBIDDEN"
+  | "INVALID_INPUT"
+  | "CODE_TAKEN"
+  | "NOT_FOUND"
+
+export class ProjectAdminError extends Error {
+  constructor(
+    message: string,
+    readonly code: ProjectAdminErrorCode
+  ) {
+    super(message)
+    this.name = "ProjectAdminError"
+  }
+}
+
+/** Only Admin and CEO create projects (planning section 7). */
+function assertCanManage(actor: Viewer) {
+  if (actor.role !== "ADMIN" && actor.role !== "CEO") {
+    throw new ProjectAdminError(
+      "Hanya Administrator dan Direktur Utama yang dapat membuat proyek.",
+      "FORBIDDEN"
+    )
+  }
+}
+
+/**
+ * Next free code for the current year, e.g. RKL-2026-017.
+ *
+ * Only a suggestion for the form - the field stays editable and uniqueness is
+ * enforced on save, because two people opening the form at once would otherwise
+ * both be handed the same number.
+ */
+export async function suggestProjectCode(): Promise<string> {
+  const year = new Date().getFullYear()
+  const prefix = `RKL-${year}-`
+
+  const latest = await prisma.project.findFirst({
+    where: { code: { startsWith: prefix } },
+    orderBy: { code: "desc" },
+    select: { code: true },
+  })
+
+  const lastNumber = latest ? Number.parseInt(latest.code.slice(prefix.length), 10) : 0
+  const next = Number.isFinite(lastNumber) ? lastNumber + 1 : 1
+
+  return `${prefix}${String(next).padStart(3, "0")}`
+}
+
+/** Engineers available to be named PIC. */
+export async function listAssignableEngineers() {
+  return prisma.user.findMany({
+    where: { role: "ENGINEER", isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, position: true },
+  })
+}
+
+export type CreateProjectInput = {
+  code: string
+  name: string
+  description: string | null
+  clientName: string | null
+  location: string | null
+  vesselName: string | null
+  contractValue: string | null
+  startDate: Date
+  targetDate: Date
+  status: ProjectStatus
+  picUserId: string | null
+}
+
+/**
+ * Creates a project, assigns its PIC, and seeds the document requirement
+ * checklist - all in one transaction.
+ *
+ * The checklist matters: a new project has to read 0/6 immediately, not stay
+ * blank until somebody remembers to add requirements by hand. That is also the
+ * moment the client sees during a demo.
+ */
+export async function createProject(
+  actor: Viewer,
+  input: CreateProjectInput
+): Promise<{ id: string }> {
+  assertCanManage(actor)
+
+  const code = input.code.trim().toUpperCase()
+  const name = input.name.trim()
+
+  if (!code) throw new ProjectAdminError("Kode proyek wajib diisi.", "INVALID_INPUT")
+  if (!name) throw new ProjectAdminError("Nama proyek wajib diisi.", "INVALID_INPUT")
+
+  if (Number.isNaN(input.startDate.getTime()) || Number.isNaN(input.targetDate.getTime())) {
+    throw new ProjectAdminError("Tanggal tidak valid.", "INVALID_INPUT")
+  }
+  if (input.targetDate.getTime() < input.startDate.getTime()) {
+    throw new ProjectAdminError(
+      "Target selesai tidak boleh lebih awal dari tanggal mulai.",
+      "INVALID_INPUT"
+    )
+  }
+
+  const existing = await prisma.project.findUnique({
+    where: { code },
+    select: { id: true },
+  })
+  if (existing) {
+    throw new ProjectAdminError(`Kode ${code} sudah dipakai proyek lain.`, "CODE_TAKEN")
+  }
+
+  if (input.picUserId) {
+    const pic = await prisma.user.findFirst({
+      where: { id: input.picUserId, role: "ENGINEER", isActive: true },
+      select: { id: true },
+    })
+    if (!pic) {
+      throw new ProjectAdminError("Engineer PIC tidak ditemukan.", "NOT_FOUND")
+    }
+  }
+
+  const categories = await prisma.documentCategory.findMany({
+    select: { id: true, key: true },
+  })
+  const categoryIdByKey = new Map(categories.map((c) => [c.key, c.id]))
+
+  return prisma.$transaction(async (tx) => {
+    const project = await tx.project.create({
+      data: {
+        code,
+        name,
+        description: input.description?.trim() || null,
+        clientName: input.clientName?.trim() || null,
+        location: input.location?.trim() || null,
+        vesselName: input.vesselName?.trim() || null,
+        contractValue: input.contractValue?.trim() || null,
+        startDate: input.startDate,
+        targetDate: input.targetDate,
+        status: input.status,
+        currentProgress: 0,
+        createdById: actor.id,
+      },
+      select: { id: true, name: true },
+    })
+
+    if (input.picUserId) {
+      await tx.projectMember.create({
+        data: { projectId: project.id, userId: input.picUserId, role: "PIC" },
+      })
+    }
+
+    await tx.documentRequirement.createMany({
+      data: DEFAULT_REQUIREMENT_TEMPLATE.map((item) => ({
+        projectId: project.id,
+        label: item.label,
+        categoryId: item.categoryKey
+          ? (categoryIdByKey.get(item.categoryKey) ?? null)
+          : null,
+        isMandatory: item.isMandatory,
+        sortOrder: item.sortOrder,
+        dueDate:
+          item.dueAfterDays === null
+            ? null
+            : new Date(input.startDate.getTime() + item.dueAfterDays * 86_400_000),
+      })),
+    })
+
+    await recordActivity(tx, {
+      actorId: actor.id,
+      projectId: project.id,
+      action: "PROJECT_CREATED",
+      summary: `membuat proyek ${project.name}`,
+      targetType: "Project",
+      targetId: project.id,
+    })
+
+    if (input.picUserId) {
+      await recordActivity(tx, {
+        actorId: actor.id,
+        projectId: project.id,
+        action: "MEMBER_ASSIGNED",
+        summary: `menugaskan PIC untuk proyek ${project.name}`,
+        targetType: "User",
+        targetId: input.picUserId,
+      })
+    }
+
+    return { id: project.id }
+  })
+}
+
+export function projectAdminErrorStatus(code: ProjectAdminErrorCode): number {
+  switch (code) {
+    case "FORBIDDEN":
+      return 403
+    case "NOT_FOUND":
+      return 404
+    case "CODE_TAKEN":
+      return 409
+    default:
+      return 400
   }
 }

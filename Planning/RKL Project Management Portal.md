@@ -122,6 +122,20 @@ New ActivityAction values: USER_CREATED / UPDATED / ACTIVATED /
   DEACTIVATED / PASSWORD_RESET (migration 20260829211838)
 ```
 
+**Create project** - Admin and CEO, from /projects:
+
+```text
+Code suggested from the highest existing code for the year, still editable;
+  uniqueness is settled on save, not in the form
+Project + PIC assignment + the full requirement checklist + activity rows,
+  all in one transaction
+The checklist is seeded from the template, so a new project reads 0/6
+  immediately instead of staying blank
+Guards, verified by test: only ADMIN/CEO, unique code, target date not
+  before the start date, PIC must be an active engineer
+Contract value hidden from anyone who may not see financials
+```
+
 **Dashboard layout** - project summary on the left; activity and the attention
 list stacked on the right. Activity shows five entries at a time with a compact
 pager, because the dashboard is a glance and the full history lives at
@@ -193,10 +207,9 @@ PDF preview mounts the protected file in the same dialog via an iframe
    the shape of the document upload path in document-service; the hard parts
    (role check in the service, transaction with the activity log, deleting the
    stored file if the transaction fails) are already solved there.
-2. **Create Project (Admin / CEO).** Seeds requirements from the template so a
-   brand new project immediately reads 0/6 - the live moment in the demo.
-   Assigning the PIC belongs here too; user administration exists now, but
-   nothing yet attaches a user to a project from the UI.
+2. **Edit project and manage members.** Creation exists; changing a project's
+   dates, status or team after the fact does not, and neither does adding a
+   second engineer to an existing project.
 3. **Progress chart** on the project Progress tab. recharts is installed and
    currently unused; `toChartSeries()` in progress-service already shapes data.
 4. **Document filters** on /documents: category, project, kind. Reuse the
@@ -211,8 +224,8 @@ PDF preview mounts the protected file in the same dialog via an iframe
 Write flows finished so far: project document upload, user administration.
 Progress cannot be updated from the UI - the seed is the only source of
   progress history. This blocks the primary demo scenario in section 38.
-Projects cannot be created from the UI, and project members cannot be
-  assigned or removed from the UI.
+Projects can be created, but not edited afterwards, and members cannot be
+  added or removed once the project exists - only the PIC named at creation.
 Settings is a read-only listing; the app name and document categories
   cannot be edited yet.
 DEMO_MODE must be "true" for the role switcher, the demo account hints

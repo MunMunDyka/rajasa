@@ -3,12 +3,17 @@ import type { Metadata } from "next"
 import { Suspense } from "react"
 
 import { PageHeader } from "@/components/layout/page-header"
+import { CreateProjectDialog } from "@/components/projects/create-project-dialog"
 import { ProjectFilters } from "@/components/projects/project-filters"
 import { ProjectTable } from "@/components/projects/project-table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { requireUser } from "@/server/auth/guards"
-import { listProjects } from "@/server/services/project-service"
+import { canManageProjects, canSeeFinancials, requireUser } from "@/server/auth/guards"
+import {
+  listAssignableEngineers,
+  listProjects,
+  suggestProjectCode,
+} from "@/server/services/project-service"
 
 export const metadata: Metadata = { title: "Proyek" }
 
@@ -33,10 +38,13 @@ export default async function ProjectsPage({
 
   const search = typeof params.q === "string" ? params.q : undefined
 
-  const projects = await listProjects({ id: user.id, role: user.role }, {
-    status,
-    search,
-  })
+  const mayCreate = canManageProjects(user.role)
+
+  const [projects, suggestedCode, engineers] = await Promise.all([
+    listProjects({ id: user.id, role: user.role }, { status, search }),
+    mayCreate ? suggestProjectCode() : Promise.resolve(""),
+    mayCreate ? listAssignableEngineers() : Promise.resolve([]),
+  ])
 
   const isEngineer = user.role === "ENGINEER"
   const filtered = Boolean(status || search)
@@ -49,6 +57,15 @@ export default async function ProjectsPage({
           isEngineer
             ? "Proyek yang ditugaskan kepada Anda."
             : "Seluruh proyek yang terdaftar di sistem."
+        }
+        actions={
+          mayCreate ? (
+            <CreateProjectDialog
+              suggestedCode={suggestedCode}
+              engineers={engineers}
+              canSeeFinancials={canSeeFinancials(user.role)}
+            />
+          ) : null
         }
       />
 
