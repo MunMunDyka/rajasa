@@ -208,9 +208,13 @@ PDF preview mounts the protected file in the same dialog via an iframe
 ## Known gaps
 
 ```text
-Project document upload is the first completed write flow.
-Progress updates, project creation, users, and settings remain read-only.
-Users and Settings are listings; editing is not implemented.
+Write flows finished so far: project document upload, user administration.
+Progress cannot be updated from the UI - the seed is the only source of
+  progress history. This blocks the primary demo scenario in section 38.
+Projects cannot be created from the UI, and project members cannot be
+  assigned or removed from the UI.
+Settings is a read-only listing; the app name and document categories
+  cannot be edited yet.
 DEMO_MODE must be "true" for the role switcher, the demo account hints
   and npm run db:seed. Next reads .env only at startup, so changing it
   requires a dev server restart - it is not picked up by hot reload.
