@@ -94,6 +94,24 @@ Seed writes real PDF and PNG files to disk, so preview never 404s
 Plus `error.tsx` and `not-found.tsx` inside the app shell, so no unhandled
 failure or missing record ever shows a raw Next error page during a demo.
 
+**Document upload** - the first write path in the system:
+
+```text
+POST /api/projects/[id]/documents
+Dialog on the project detail page, for CEO / Accountant / Admin only
+Optionally marks a requirement as fulfilled in the same action
+Role check in the service, not the route
+Document row + ActivityLog written in one transaction
+Stored file deleted again if that transaction fails, so a failed upload
+  never leaves an orphaned file on disk
+```
+
+**Dashboard layout** - project summary on the left; activity and the attention
+list stacked on the right. Activity shows five entries at a time with a compact
+pager, because the dashboard is a glance and the full history lives at
+/activity. Sidebar narrowed to 14rem; the labels are short and the rest was
+gutter.
+
 **Visual system and file preview**
 
 ```text
@@ -154,14 +172,20 @@ PDF preview mounts the protected file in the same dialog via an iframe
 1. **Update Progress (Engineer).** Dialog on desktop, sheet on mobile:
    percentage, description, date, evidence upload. Writes a ProgressUpdate,
    refreshes `Project.currentProgress` and the ActivityLog in one transaction.
-   This is the centre of demo scenario 38 and the largest remaining gap.
+   This is the centre of demo scenario 38 and the largest remaining gap - the
+   only step in the primary demo script that cannot be performed yet. Follow
+   the shape of the document upload path in document-service; the hard parts
+   (role check in the service, transaction with the activity log, deleting the
+   stored file if the transaction fails) are already solved there.
 2. **Create Project (Admin / CEO).** Seeds requirements from the template so a
    brand new project immediately reads 0/6 - the live moment in the demo.
 3. **Progress chart** on the project Progress tab. recharts is installed and
    currently unused; `toChartSeries()` in progress-service already shapes data.
-4. **Document filters** on /documents: category, project, kind.
+4. **Document filters** on /documents: category, project, kind. Reuse the
+   URL-driven pattern from ProjectFilters rather than inventing a second one.
 5. **Delete document** (Admin, soft delete, with confirmation).
 6. **Playwright** coverage of the three demo flows in section 10.
+7. **Mobile pass** at 390px, especially the tables and the progress dialog.
 
 ## Known gaps
 
@@ -169,8 +193,10 @@ PDF preview mounts the protected file in the same dialog via an iframe
 Project document upload is the first completed write flow.
 Progress updates, project creation, users, and settings remain read-only.
 Users and Settings are listings; editing is not implemented.
-DEMO_MODE is currently "false" in .env, which hides the role switcher
-  and the demo account hints. Set it to "true" for a client demo.
+DEMO_MODE must be "true" for the role switcher, the demo account hints
+  and npm run db:seed. Next reads .env only at startup, so changing it
+  requires a dev server restart - it is not picked up by hot reload.
+public/brand/background.jpg is 2.4 MB; compress it before go-live.
 ```
 
 ---

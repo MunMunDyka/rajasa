@@ -1,14 +1,46 @@
-import type { ActivityAction } from "@prisma/client"
-import { FileUp, FileX2, History, TrendingUp, UserPlus } from "lucide-react"
-import Link from "next/link"
+"use client"
 
+import type { ActivityAction } from "@prisma/client"
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  FileX2,
+  History,
+  TrendingUp,
+  UserPlus,
+} from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+
+import { EmptyState } from "@/components/layout/page-header"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { formatRelative, initials } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { ActivityItem } from "@/server/services/activity-service"
 
-/** Recent activity feed (planning section 23). */
+/**
+ * Recent activity feed (planning section 23).
+ *
+ * Paged five at a time rather than rendering the whole list. The dashboard is a
+ * glance, not an archive: five entries answer "what changed lately" without the
+ * card growing taller than the project table beside it. The full history lives
+ * at /activity.
+ *
+ * Paging is client-side over an already-fetched slice - no request per page, and
+ * no spinner for something this small.
+ */
+
+const PAGE_SIZE = 5
 
 const ACTION_ICONS: Partial<Record<ActivityAction, typeof History>> = {
   PROGRESS_UPDATED: TrendingUp,
@@ -38,46 +70,55 @@ function ProgressDelta({ metadata }: { metadata: ActivityItem["metadata"] }) {
 }
 
 export function RecentActivity({ items }: { items: ActivityItem[] }) {
+  const [page, setPage] = useState(0)
+
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  // Clamped rather than stored blindly, so the page can never point past the end
+  // if the list shrinks under it after a refresh.
+  const current = Math.min(page, pageCount - 1)
+  const start = current * PAGE_SIZE
+  const visible = items.slice(start, start + PAGE_SIZE)
+
   return (
-    <Card className="h-full">
+    <Card className="flex h-full flex-col">
       <CardHeader className="border-b">
         <div className="flex items-center gap-2">
           <History className="size-4 text-brand-navy" />
           <CardTitle>Aktivitas Terkini</CardTitle>
         </div>
         <CardDescription>
-          Pembaruan progress dan dokumen terbaru di seluruh proyek.
+          Pembaruan progress dan dokumen terbaru.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+
+      <CardContent className="flex-1">
         {items.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <div className="rounded-full bg-muted p-2.5">
-              <History className="size-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium">Belum ada aktivitas.</p>
-            <p className="text-xs text-muted-foreground">
-              Pembaruan progress dan unggahan dokumen akan tampil di sini.
-            </p>
-          </div>
+          <EmptyState
+            icon={History}
+            title="Belum ada aktivitas"
+            description="Pembaruan progress dan unggahan dokumen akan tampil di sini."
+          />
         ) : (
           <ol className="divide-y">
-            {items.map((item) => {
+            {visible.map((item) => {
               const Icon = ACTION_ICONS[item.action] ?? History
               return (
-                <li key={item.id} className="flex gap-3 py-3.5 first:pt-0 last:pb-0">
-                  <div className="flex flex-col items-center">
-                    <Avatar className="size-9">
-                      <AvatarFallback className="bg-brand-navy/9 text-[10px] font-semibold text-brand-navy">
-                        {initials(item.actor.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </div>
+                <li
+                  key={item.id}
+                  className="flex gap-3 py-3.5 first:pt-0 last:pb-0"
+                >
+                  <Avatar className="size-9 shrink-0">
+                    <AvatarFallback className="bg-brand-navy/9 text-[10px] font-semibold text-brand-navy">
+                      {initials(item.actor.name)}
+                    </AvatarFallback>
+                  </Avatar>
 
                   <div className="min-w-0 flex-1 space-y-1">
                     <p className="text-sm leading-snug">
                       <span className="font-medium">{item.actor.name}</span>{" "}
-                      <span className="text-muted-foreground">{item.summary}</span>
+                      <span className="text-muted-foreground">
+                        {item.summary}
+                      </span>
                     </p>
 
                     <div className="flex flex-wrap items-center gap-2">
@@ -86,12 +127,12 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
                         <Link
                           href={`/projects/${item.project.id}`}
                           className={cn(
-                            "inline-flex items-center gap-1 text-xs text-muted-foreground",
+                            "inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground",
                             "hover:text-foreground hover:underline"
                           )}
                         >
-                          <Icon className="size-3" />
-                          {item.project.name}
+                          <Icon className="size-3 shrink-0" />
+                          <span className="truncate">{item.project.name}</span>
                         </Link>
                       ) : null}
                       <span className="text-xs text-muted-foreground">
@@ -105,6 +146,36 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
           </ol>
         )}
       </CardContent>
+
+      {items.length > PAGE_SIZE ? (
+        <CardFooter className="justify-between border-t pt-4">
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {start + 1}–{start + visible.length} dari {items.length}
+          </span>
+          <div className="flex gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-7"
+              disabled={current === 0}
+              onClick={() => setPage(current - 1)}
+              aria-label="Aktivitas sebelumnya"
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-7"
+              disabled={current >= pageCount - 1}
+              onClick={() => setPage(current + 1)}
+              aria-label="Aktivitas berikutnya"
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }

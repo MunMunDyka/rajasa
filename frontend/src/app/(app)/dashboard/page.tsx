@@ -28,7 +28,8 @@ export default async function DashboardPage() {
 
   const [projectData, activity] = await Promise.all([
     getDashboardProjectData(viewer),
-    listRecentActivity(viewer, 6),
+    // 20 rows so the five-per-page card has something to page through.
+    listRecentActivity(viewer, 20),
   ])
   const { stats, projects, attention } = projectData
 
@@ -47,7 +48,10 @@ export default async function DashboardPage() {
 
       <StatCards stats={stats} />
 
-      <Card>
+      {/* Project summary on the left, activity and attention stacked on the
+          right. Keeps the page to two visual rows instead of three. */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
+        <Card className="flex h-full flex-col">
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-base">Ringkasan Proyek</CardTitle>
             <Button asChild variant="ghost" size="sm">
@@ -57,7 +61,7 @@ export default async function DashboardPage() {
               </Link>
             </Button>
           </CardHeader>
-          <CardContent className="px-0">
+          <CardContent className="flex-1 px-0">
             <ProjectTable
               projects={projects}
               showLastUpdate={false}
@@ -69,11 +73,12 @@ export default async function DashboardPage() {
               }
             />
           </CardContent>
-      </Card>
+        </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <RecentActivity items={activity} />
-        <AttentionList projects={attention} />
+        <div className="flex flex-col gap-4">
+          <RecentActivity items={activity} />
+          <AttentionList projects={attention} />
+        </div>
       </div>
     </div>
   )

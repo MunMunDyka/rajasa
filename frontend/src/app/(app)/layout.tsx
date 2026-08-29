@@ -29,7 +29,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   }
 
   return (
-    <SidebarProvider className="bg-background">
+    <SidebarProvider
+      className="bg-background"
+      // 14rem instead of the 16rem default. The navigation labels are short, so
+      // the extra 2rem was empty gutter that the content could use instead.
+      style={{ "--sidebar-width": "14rem" } as React.CSSProperties}
+    >
       <AppSidebar role={user.role} />
       <SidebarInset className="min-w-0">
         <Topbar user={user} demoOptions={demoOptions} />
