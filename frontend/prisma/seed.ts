@@ -45,7 +45,14 @@ const TODAY = new Date()
 function daysAgo(days: number): Date {
   const date = new Date(TODAY)
   date.setDate(date.getDate() - days)
-  date.setHours(9, 0, 0, 0)
+
+  // Spread the clock time across a working day. Every row used to be pinned to
+  // 09:00, which was invisible until the activity feed started showing the
+  // hour - then the whole feed read as a wall of identical timestamps.
+  // Derived from the day offset rather than random, so re-running the seed
+  // produces the same data.
+  const key = Math.abs(days)
+  date.setHours(8 + ((key * 7) % 9), (key * 17) % 60, 0, 0)
   return date
 }
 

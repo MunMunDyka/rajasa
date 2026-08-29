@@ -5,7 +5,7 @@ import Link from "next/link"
 
 import { EmptyState, PageHeader } from "@/components/layout/page-header"
 import { Card, CardContent } from "@/components/ui/card"
-import { formatDateTime, formatRelative } from "@/lib/format"
+import { formatDateTime, formatDayTime } from "@/lib/format"
 import { requireUser } from "@/server/auth/guards"
 import { listRecentActivity } from "@/server/services/activity-service"
 
@@ -61,9 +61,13 @@ export default async function ActivityPage() {
                             {item.project.name}
                           </Link>
                         ) : null}
-                        <span title={formatDateTime(item.createdAt)}>
-                          {formatRelative(item.createdAt)}
-                        </span>
+                        <time
+                          dateTime={new Date(item.createdAt).toISOString()}
+                          title={formatDateTime(item.createdAt)}
+                          className="tabular-nums"
+                        >
+                          {formatDayTime(item.createdAt)}
+                        </time>
                       </div>
                     </div>
                   </li>

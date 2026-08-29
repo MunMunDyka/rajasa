@@ -24,7 +24,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { formatRelative, initials } from "@/lib/format"
+import { formatDateTime, formatDayTime, initials } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { ActivityItem } from "@/server/services/activity-service"
 
@@ -114,15 +114,27 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
                   </Avatar>
 
                   <div className="min-w-0 flex-1 space-y-1">
-                    {/* break-words, not truncate: an activity line that gets
-                        cut off mid-sentence is useless, and this column gets
-                        narrow on a zoomed or small screen. */}
-                    <p className="text-sm leading-snug break-words">
-                      <span className="font-medium">{item.actor.name}</span>{" "}
-                      <span className="text-muted-foreground">
-                        {item.summary}
-                      </span>
-                    </p>
+                    {/* Timestamp sits on the right of the first line, not in
+                        the meta row: it is the one field every entry has, so
+                        keeping it in a fixed column lets the eye scan straight
+                        down. shrink-0 keeps it whole and lets the sentence wrap
+                        instead. break-words on the sentence because an activity
+                        line cut off mid-word is useless. */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 text-sm leading-snug break-words">
+                        <span className="font-medium">{item.actor.name}</span>{" "}
+                        <span className="text-muted-foreground">
+                          {item.summary}
+                        </span>
+                      </p>
+                      <time
+                        dateTime={new Date(item.createdAt).toISOString()}
+                        title={formatDateTime(item.createdAt)}
+                        className="shrink-0 pt-0.5 text-[11px] tabular-nums whitespace-nowrap text-muted-foreground"
+                      >
+                        {formatDayTime(item.createdAt)}
+                      </time>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <ProgressDelta metadata={item.metadata} />
@@ -138,9 +150,6 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
                           <span className="truncate">{item.project.name}</span>
                         </Link>
                       ) : null}
-                      <span className="text-xs text-muted-foreground">
-                        {formatRelative(item.createdAt)}
-                      </span>
                     </div>
                   </div>
                 </li>
