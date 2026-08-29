@@ -41,7 +41,36 @@ export default async function UsersPage() {
 
       <Card className="py-0">
         <CardContent className="px-0">
-          <div className="overflow-x-auto">
+          {/* Card list below md. The table has six columns; on a phone that is
+              a sideways scroll nobody discovers, so the same rows are stacked
+              instead. Same pattern as ProjectTable and DocumentList. */}
+          <div className="divide-y md:hidden">
+            {users.map((user) => (
+              <article key={user.id} className="space-y-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold leading-snug text-brand-navy">
+                      {user.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {user.email}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-md border bg-card px-2 py-0.5 text-xs font-medium whitespace-nowrap">
+                    {ROLE_LABELS[user.role]}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span>{user.position ?? "Tanpa jabatan"}</span>
+                  <span className="tabular-nums">{user.projectCount} proyek</span>
+                  <span>{user.isActive ? "Aktif" : "Nonaktif"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>

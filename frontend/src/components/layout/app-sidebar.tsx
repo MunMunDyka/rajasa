@@ -21,6 +21,44 @@ import {
 import { COMPANY_SHORT, LOGO_PATH } from "@/config/app"
 import { getNavigation } from "@/config/navigation"
 
+/**
+ * Decorative wave at the foot of the sidebar.
+ *
+ * Three maroon layers, each a little more opaque than the one above it, so the
+ * colour builds towards the bottom edge instead of stopping at a hard line.
+ * `preserveAspectRatio="none"` lets it stretch to whatever width the sidebar
+ * currently has, including the 3rem collapsed rail.
+ *
+ * aria-hidden: it carries no meaning, and a screen reader announcing a shape
+ * here would be noise.
+ */
+function SidebarWave() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 224 120"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full"
+    >
+      <path
+        fill="var(--brand-maroon)"
+        opacity="0.09"
+        d="M0,58 C48,22 92,88 140,54 C178,27 204,58 224,44 L224,120 L0,120 Z"
+      />
+      <path
+        fill="var(--brand-maroon)"
+        opacity="0.16"
+        d="M0,78 C44,44 94,100 144,71 C184,49 208,77 224,65 L224,120 L0,120 Z"
+      />
+      <path
+        fill="var(--brand-maroon)"
+        opacity="0.26"
+        d="M0,97 C54,71 100,111 150,91 C190,75 210,95 224,87 L224,120 L0,120 Z"
+      />
+    </svg>
+  )
+}
+
 export function AppSidebar({ role }: { role: UserRole }) {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
@@ -94,8 +132,9 @@ export function AppSidebar({ role }: { role: UserRole }) {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-2 rounded-md bg-muted/70 px-2.5 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      <SidebarFooter className="relative overflow-hidden border-t border-sidebar-border p-3 pt-10">
+        <SidebarWave />
+        <div className="relative flex items-center gap-2 rounded-md bg-card/80 px-2.5 py-2 backdrop-blur-[2px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <span className="size-2 shrink-0 rounded-full bg-success" />
           <p className="text-[11px] leading-tight text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
             Sistem demo aktif
