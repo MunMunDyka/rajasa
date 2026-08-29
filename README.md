@@ -54,44 +54,146 @@ That keeps the business logic framework-free if a standalone API is ever needed.
 
 ---
 
-## Local setup
+## Getting started
+
+Cloning this repository is not enough to run it. `.env` is deliberately not
+committed - it holds the database password and the session secret - and the
+uploaded demo files are not committed either. Both are recreated below.
+
+Budget about ten minutes, most of it waiting for Supabase to provision.
+
+### Prerequisites
+
+```text
+Node.js 20 or newer      developed on 24.11
+A Supabase account       the free tier is enough
+```
+
+That is the whole list. No Docker, no local PostgreSQL install, no global CLIs.
+
+### 1. Create the database
+
+1. Go to [supabase.com](https://supabase.com) and create a **New project**
+2. Region: **Southeast Asia (Singapore)** - closest to Jakarta
+3. Set a **Database Password** and save it somewhere. This is the only database
+   password there is; it is not your supabase.com account password.
+   Prefer letters and digits only - a password containing `@ : / ? # %` has to be
+   URL-encoded inside the connection string, which trips people up.
+4. Wait for provisioning, then click **Connect** in the top bar
+5. Open the **ORMs** tab and choose **Prisma**
+
+Supabase prints exactly the two variables the next step needs.
+
+### 2. Configure the app
 
 ```bash
 cd frontend
+cp .env.example .env
+```
+
+Then fill in four values:
+
+| Variable | Where it comes from |
+|---|---|
+| `DATABASE_URL` | Supabase → Connect → ORMs → Prisma. Port **6543**, keep `?pgbouncer=true` |
+| `DIRECT_URL` | Same panel. Port **5432** |
+| `AUTH_SECRET` | Generate one: `npx auth secret` |
+| `DEMO_MODE` | `"true"` for a demo, `"false"` for real use |
+
+**Why two database URLs.** Port 6543 is Supabase's transaction pooler - the right
+endpoint for the short queries the running app makes. Port 5432 is a direct
+session, which Prisma Migrate needs because migrations cannot run through a
+pooler. The app reads the first, the CLI reads the second. At go-live both point
+at the same local Postgres and nothing else changes.
+
+The remaining variables in `.env.example` have working defaults; leave them.
+
+### 3. Create the schema and demo data
+
+```bash
 npm install
-cp .env.example .env        # then fill in the values below
-npx prisma migrate dev
-npm run db:seed
+npx prisma migrate deploy    # creates the 9 tables
+npm run db:seed              # demo users, projects, documents
+```
+
+`db:seed` does two things worth knowing:
+
+- It **deletes every row** before inserting, so it is safe to re-run whenever you
+  want a clean demo state - and it **refuses to run unless `DEMO_MODE="true"`**,
+  so it can never wipe a production database.
+- It **writes real PDF and PNG files** to `frontend/storage/uploads/`. Those files
+  are not in git, so without this step every document preview returns 410.
+
+### 4. Run it
+
+```bash
 npm run dev
 ```
 
-### Supabase project settings (Phase A)
+Open <http://localhost:3000>.
 
-- Region: **Southeast Asia (Singapore)** — closest to Jakarta.
-- Free tier **auto-pauses after 7 days of inactivity**. Open the Supabase dashboard and
-  resume the project **the day before any client demo**, then run `npm run db:seed` to
-  reset the data to a clean demo state.
-- Free tier has **no backups**. Do not let real client data accumulate here.
+### Demo accounts
 
-### Environment variables
+Password for every account: **`demo1234`**
 
-```ini
-# Phase A: Supabase transaction pooler, port 6543
-DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
-# Phase A: Supabase direct connection, port 5432 — used by Prisma Migrate only
-DIRECT_URL="postgresql://postgres.<ref>:<password>@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+| Email | Name | Role |
+|---|---|---|
+| `ceo@demo.local` | Hendra Kusuma | Direktur Utama |
+| `accountant@demo.local` | Siti Rahma | Finance |
+| `engineer@demo.local` | Budi Santoso | Engineer |
+| `engineer2@demo.local` | Andi Wijaya | Engineer |
+| `admin@demo.local` | Admin Sistem | Administrator |
 
-AUTH_SECRET="<openssl rand -base64 32>"
-AUTH_URL="http://localhost:3000"
+With `DEMO_MODE="true"` you do not need to type any of this: the login page shows
+one-click buttons that fill the fields, and a **Mode Demo** control in the top bar
+switches role without logging out. Both disappear when `DEMO_MODE="false"`.
 
-# Root directory for uploaded files. Never inside the code directory in production.
-UPLOAD_ROOT="./storage/uploads"
+---
 
-# Enables the topbar role switcher. MUST be false in Phase B.
-DEMO_MODE="true"
+## Scripts
+
+```text
+npm run dev          development server
+npm run build        production build
+npm start            serve the production build
+npm run lint         eslint over src and prisma
+npm run typecheck    tsc --noEmit
+npm run db:migrate   create and apply a new migration
+npm run db:deploy    apply existing migrations (production)
+npm run db:seed      reset to clean demo data
+npm run db:studio    browse the database in Prisma Studio
 ```
 
-`.env` is gitignored and must never be committed.
+---
+
+## Troubleshooting
+
+**Every route returns 404, and the console shows `ClientFetchError: Unexpected
+token '<'`.** The `.next` directory holds artefacts from a production build while
+the dev server expects development ones, so route resolution fails and
+`/api/auth/session` returns an HTML 404 page that Auth.js tries to parse as JSON.
+Stop the dev server first - Windows locks the directory while it runs - then:
+
+```bash
+rm -rf .next && npm run dev
+```
+
+**A change to `.env` seems to do nothing.** Next reads `.env` once at startup. It
+is not part of hot reload. Restart the dev server.
+
+**`Can't reach database server`.** The Supabase free tier pauses a project after
+7 days of inactivity. Open the Supabase dashboard and resume it. Do this the day
+before a client demo, not during one.
+
+**`prisma migrate` fails but the app works.** `DIRECT_URL` is probably pointing at
+port 6543. Migrations need the direct connection on 5432.
+
+**Document preview returns 410.** The database row exists but the file does not -
+usually a fresh clone, since `storage/uploads/` is not in git. Run
+`npm run db:seed`.
+
+**Login always fails with correct credentials.** Check that `AUTH_SECRET` is set
+and that the seed has run. Without a seeded user there is nothing to log in as.
 
 ---
 
