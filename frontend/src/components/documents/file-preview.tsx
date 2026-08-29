@@ -2,6 +2,7 @@
 
 import { ExternalLink, Eye, FileText, ImageIcon } from "lucide-react"
 import Image from "next/image"
+import type { ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -61,16 +62,19 @@ export function FileThumbnail({
   )
 }
 
-export function FilePreviewButton({
+/**
+ * The preview dialog, with the trigger left to the caller.
+ *
+ * Splitting it this way is what lets the thumbnail open the preview: a document
+ * row no longer needs a separate action column whose only job is to repeat what
+ * clicking the file itself should already do.
+ */
+export function FilePreview({
   file,
-  compact = false,
-  label = "Preview",
-  className,
+  children,
 }: {
   file: PreviewFile
-  compact?: boolean
-  label?: string
-  className?: string
+  children: ReactNode
 }) {
   const fileUrl = `/api/files/${file.id}`
   const isImage = file.mimeType.startsWith("image/")
@@ -78,17 +82,7 @@ export function FilePreviewButton({
 
   return (
     <Dialog>
-      <DialogTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size={compact ? "xs" : "sm"}
-          className={className}
-        >
-          <Eye className="size-3.5" />
-          <span className="max-w-48 truncate">{label}</span>
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{children}</DialogTrigger>
 
       <DialogContent className="grid h-[90vh] max-h-[920px] w-[calc(100vw-1rem)] max-w-6xl grid-rows-[auto_minmax(240px,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-6xl">
         <DialogHeader className="border-b px-5 py-4 pr-14">
@@ -134,5 +128,64 @@ export function FilePreviewButton({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * Clickable thumbnail. Carries a visible hover state and an aria-label, because
+ * an image that silently happens to be a button is a control nobody finds.
+ */
+export function FileThumbnailButton({
+  file,
+  className,
+}: {
+  file: PreviewFile
+  className?: string
+}) {
+  return (
+    <FilePreview file={file}>
+      <button
+        type="button"
+        aria-label={`Pratinjau ${file.name}`}
+        title={`Pratinjau ${file.name}`}
+        className={cn(
+          "group relative shrink-0 cursor-pointer rounded-md",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          className
+        )}
+      >
+        <FileThumbnail file={file} className="transition-opacity group-hover:opacity-70" />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-brand-navy/0 opacity-0 transition-all group-hover:bg-brand-navy/35 group-hover:opacity-100">
+          <Eye className="size-4 text-white" />
+        </span>
+      </button>
+    </FilePreview>
+  )
+}
+
+/** Button-shaped trigger, still used by the progress timeline's evidence chips. */
+export function FilePreviewButton({
+  file,
+  compact = false,
+  label = "Preview",
+  className,
+}: {
+  file: PreviewFile
+  compact?: boolean
+  label?: string
+  className?: string
+}) {
+  return (
+    <FilePreview file={file}>
+      <Button
+        type="button"
+        variant="outline"
+        size={compact ? "xs" : "sm"}
+        className={className}
+      >
+        <Eye className="size-3.5" />
+        <span className="max-w-48 truncate">{label}</span>
+      </Button>
+    </FilePreview>
   )
 }

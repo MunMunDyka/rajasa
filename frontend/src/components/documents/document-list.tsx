@@ -1,10 +1,7 @@
 import { CalendarDays, FolderOpen, FolderKanban, UserRound } from "lucide-react"
 import Link from "next/link"
 
-import {
-  FilePreviewButton,
-  FileThumbnail,
-} from "@/components/documents/file-preview"
+import { FileThumbnailButton } from "@/components/documents/file-preview"
 import { EmptyState } from "@/components/layout/page-header"
 import {
   Table,
@@ -58,7 +55,7 @@ export function DocumentList({
         {documents.map((document) => (
           <article key={document.id} className="space-y-3.5 p-4">
             <div className="flex items-start gap-3">
-              <FileThumbnail file={document} />
+              <FileThumbnailButton file={document} />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-snug text-brand-navy">
                   {document.name}
@@ -73,7 +70,6 @@ export function DocumentList({
                   <KindLabel kind={document.kind} />
                 </div>
               </div>
-              <FilePreviewButton file={document} compact className="shrink-0" />
             </div>
 
             <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
@@ -115,7 +111,6 @@ export function DocumentList({
               {showProject ? <TableHead className="min-w-52">Proyek</TableHead> : null}
               <TableHead className="min-w-36">Diunggah oleh</TableHead>
               <TableHead className="min-w-28">Tanggal</TableHead>
-              <TableHead className="w-28 text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,7 +118,7 @@ export function DocumentList({
               <TableRow key={document.id}>
                 <TableCell>
                   <div className="flex items-start gap-3">
-                    <FileThumbnail file={document} />
+                    <FileThumbnailButton file={document} />
                     <div className="min-w-0 space-y-1">
                       <p className="max-w-sm whitespace-normal font-semibold leading-snug text-brand-navy">
                         {document.name}
@@ -159,10 +154,6 @@ export function DocumentList({
 
                 <TableCell className="text-sm whitespace-nowrap">
                   {formatDate(document.documentDate ?? document.uploadedAt)}
-                </TableCell>
-
-                <TableCell className="text-right">
-                  <FilePreviewButton file={document} />
                 </TableCell>
               </TableRow>
             ))}
