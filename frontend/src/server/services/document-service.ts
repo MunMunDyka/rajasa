@@ -72,10 +72,15 @@ export type DocumentFilters = {
   take?: number
 }
 
-export async function listDocuments(
+/**
+ * Builds the WHERE clause once so the list query and the count query can never
+ * drift apart - a paginator whose total is computed from a different filter set
+ * than its rows is the classic source of empty last pages.
+ */
+function buildWhere(
   viewer: Viewer,
-  filters: DocumentFilters = {}
-): Promise<DocumentListItem[]> {
+  filters: DocumentFilters
+): Prisma.DocumentWhereInput {
   const where = scopeFor(viewer)
 
   if (filters.projectId) where.projectId = filters.projectId
@@ -97,11 +102,76 @@ export async function listDocuments(
     ]
   }
 
+  return where
+}
+
+export async function listDocuments(
+  viewer: Viewer,
+  filters: DocumentFilters = {}
+): Promise<DocumentListItem[]> {
   return prisma.document.findMany({
-    where,
+    where: buildWhere(viewer, filters),
     select: documentSelect,
     orderBy: { uploadedAt: "desc" },
     take: filters.take,
+  })
+}
+
+export const DOCUMENT_PAGE_SIZES = [5, 10, 15, 25] as const
+export const DEFAULT_DOCUMENT_PAGE_SIZE = 5
+
+export type DocumentPage = {
+  items: DocumentListItem[]
+  total: number
+  page: number
+  pageSize: number
+  pageCount: number
+}
+
+/**
+ * One page of documents, filtered and counted with the same clause.
+ *
+ * The page number is clamped to the available range rather than trusted, so a
+ * stale `?page=9` in a bookmark lands on the last real page instead of an empty
+ * table.
+ */
+export async function listDocumentsPage(
+  viewer: Viewer,
+  filters: DocumentFilters,
+  paging: { page?: number; pageSize?: number } = {}
+): Promise<DocumentPage> {
+  const where = buildWhere(viewer, filters)
+
+  const pageSize = DOCUMENT_PAGE_SIZES.includes(
+    paging.pageSize as (typeof DOCUMENT_PAGE_SIZES)[number]
+  )
+    ? (paging.pageSize as number)
+    : DEFAULT_DOCUMENT_PAGE_SIZE
+
+  const total = await prisma.document.count({ where })
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const page = Math.min(Math.max(1, paging.page ?? 1), pageCount)
+
+  const items = await prisma.document.findMany({
+    where,
+    select: documentSelect,
+    orderBy: { uploadedAt: "desc" },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  })
+
+  return { items, total, page, pageSize, pageCount }
+}
+
+/** Projects the viewer may filter by, for the documents page dropdown. */
+export async function listFilterableProjects(viewer: Viewer) {
+  return prisma.project.findMany({
+    where:
+      viewer.role === "ENGINEER"
+        ? { members: { some: { userId: viewer.id } } }
+        : {},
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, code: true },
   })
 }
 
