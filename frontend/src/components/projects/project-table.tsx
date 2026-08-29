@@ -19,6 +19,22 @@ import {
 import { formatDate, formatRelative } from "@/lib/format"
 import type { ProjectListItem } from "@/server/services/project-service"
 
+/**
+ * One badge, not two.
+ *
+ * A row previously stacked "Berjalan" on top of "Terlambat", which doubled the
+ * row height and made the column the loudest thing in the table. Being late is
+ * the fact that needs acting on, so it wins; the underlying status is still on
+ * the project detail page.
+ */
+function StatusCell({ project }: { project: ProjectListItem }) {
+  return project.flags.delayed ? (
+    <DelayedBadge />
+  ) : (
+    <StatusBadge status={project.status} />
+  )
+}
+
 export function ProjectTable({
   projects,
   emptyTitle = "Belum ada proyek",
@@ -67,8 +83,7 @@ export function ProjectTable({
             <ProgressCell value={project.currentProgress} />
 
             <div className="flex flex-wrap items-center gap-1.5">
-              <StatusBadge status={project.status} />
-              {project.flags.delayed ? <DelayedBadge /> : null}
+              <StatusCell project={project} />
               <DocumentsBadge {...project.documents} />
             </div>
 
@@ -88,12 +103,19 @@ export function ProjectTable({
 
       <div className="hidden overflow-x-auto md:block">
         <Table>
-          <TableHeader>
-            <TableRow>
+          {/* No filled header band. Between the card border, a header fill,
+              a header rule and a rule under every row, the table was mostly
+              lines. One hairline under the header is enough; rows are separated
+              by space and a hover tint instead. */}
+          <TableHeader className="bg-transparent">
+            <TableRow className="hover:bg-transparent">
               <TableHead className="min-w-64">Proyek</TableHead>
               {!compact ? <TableHead className="min-w-36">PIC</TableHead> : null}
               <TableHead className="min-w-40">Progress</TableHead>
-              <TableHead className="min-w-28">Target</TableHead>
+              {/* Target date is dropped from the compact dashboard table: a
+                  delayed project already says so in the Status column, and the
+                  full date is on /projects and the detail page. */}
+              {!compact ? <TableHead className="min-w-28">Target</TableHead> : null}
               <TableHead className="min-w-28">Status</TableHead>
               {!compact ? <TableHead className="min-w-24">Dokumen</TableHead> : null}
               {showLastUpdate ? <TableHead className="min-w-28">Update</TableHead> : null}
@@ -104,7 +126,10 @@ export function ProjectTable({
           </TableHeader>
           <TableBody>
             {projects.map((project) => (
-              <TableRow key={project.id} className="group relative">
+              <TableRow
+                key={project.id}
+                className="group relative border-0 hover:bg-muted/40"
+              >
                 <TableCell>
                   <Link
                     href={`/projects/${project.id}`}
@@ -129,14 +154,13 @@ export function ProjectTable({
                 <TableCell>
                   <ProgressCell value={project.currentProgress} />
                 </TableCell>
-                <TableCell className="text-sm whitespace-nowrap">
-                  {formatDate(project.targetDate)}
-                </TableCell>
+                {!compact ? (
+                  <TableCell className="text-sm whitespace-nowrap">
+                    {formatDate(project.targetDate)}
+                  </TableCell>
+                ) : null}
                 <TableCell>
-                  <div className="flex flex-col items-start gap-1">
-                    <StatusBadge status={project.status} />
-                    {project.flags.delayed ? <DelayedBadge /> : null}
-                  </div>
+                  <StatusCell project={project} />
                 </TableCell>
                 {!compact ? (
                   <TableCell>

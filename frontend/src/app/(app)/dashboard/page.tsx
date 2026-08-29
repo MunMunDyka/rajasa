@@ -50,7 +50,10 @@ export default async function DashboardPage() {
 
       {/* Project summary on the left, activity and attention stacked on the
           right. Keeps the page to two visual rows instead of three. */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
+      {/* Splits at lg (1024px), not xl (1280px). A laptop at 125-130% browser
+          zoom lands just under 1280 effective pixels and would otherwise get a
+          single stacked column on what is clearly a wide screen. */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(300px,0.9fr)]">
         <Card className="flex h-full flex-col">
           <CardHeader className="flex-row items-center justify-between gap-2 space-y-0">
             <CardTitle className="text-base">Ringkasan Proyek</CardTitle>
