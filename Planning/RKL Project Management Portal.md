@@ -106,6 +106,22 @@ Stored file deleted again if that transaction fails, so a failed upload
   never leaves an orphaned file on disk
 ```
 
+**User administration** - admin only, the second write path:
+
+```text
+Create, edit identity and role, reset password, activate / deactivate
+No delete: ActivityLog.actorId is onDelete Restrict, so a user with history
+  cannot be removed - deactivation keeps project history attributable
+Guards, all enforced in the service and verified by test:
+  - only ADMIN may act
+  - an admin cannot change their own role or deactivate themselves
+  - the last active admin cannot be demoted or deactivated
+  - email is unique and normalised to lowercase
+  - passwords are bcrypt-hashed, never echoed into the activity log
+New ActivityAction values: USER_CREATED / UPDATED / ACTIVATED /
+  DEACTIVATED / PASSWORD_RESET (migration 20260829211838)
+```
+
 **Dashboard layout** - project summary on the left; activity and the attention
 list stacked on the right. Activity shows five entries at a time with a compact
 pager, because the dashboard is a glance and the full history lives at
@@ -179,6 +195,8 @@ PDF preview mounts the protected file in the same dialog via an iframe
    stored file if the transaction fails) are already solved there.
 2. **Create Project (Admin / CEO).** Seeds requirements from the template so a
    brand new project immediately reads 0/6 - the live moment in the demo.
+   Assigning the PIC belongs here too; user administration exists now, but
+   nothing yet attaches a user to a project from the UI.
 3. **Progress chart** on the project Progress tab. recharts is installed and
    currently unused; `toChartSeries()` in progress-service already shapes data.
 4. **Document filters** on /documents: category, project, kind. Reuse the

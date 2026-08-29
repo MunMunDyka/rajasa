@@ -69,6 +69,15 @@ enum ActivityAction {
   DOCUMENT_DELETED
   REQUIREMENT_ADDED
   REQUIREMENT_FULFILLED
+
+  // User administration. Role changes and password resets are exactly the kind
+  // of action that needs a trail, so they are logged like everything else.
+  // These rows carry no projectId.
+  USER_CREATED
+  USER_UPDATED
+  USER_ACTIVATED
+  USER_DEACTIVATED
+  USER_PASSWORD_RESET
 }
 
 // ---------------------------------------------------------------------------

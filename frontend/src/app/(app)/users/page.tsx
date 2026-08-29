@@ -2,8 +2,12 @@ import type { Metadata } from "next"
 
 import { AccessDenied } from "@/components/layout/access-denied"
 import { PageHeader } from "@/components/layout/page-header"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+import { UserActiveToggle } from "@/components/users/user-active-toggle"
+import {
+  CreateUserDialog,
+  EditUserDialog,
+  ResetPasswordDialog,
+} from "@/components/users/user-dialogs"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Table,
@@ -14,11 +18,57 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { ROLE_LABELS } from "@/config/navigation"
-import { initials } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import { canManageUsers, requireUser } from "@/server/auth/guards"
-import { listUsers } from "@/server/services/user-service"
+import { listUsers, type UserListItem } from "@/server/services/user-service"
 
 export const metadata: Metadata = { title: "Pengguna" }
+
+function StatusDot({ isActive }: { isActive: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          isActive ? "bg-success" : "bg-muted-foreground/40"
+        )}
+      />
+      {isActive ? "Aktif" : "Nonaktif"}
+    </span>
+  )
+}
+
+function RowActions({ user, isSelf }: { user: UserListItem; isSelf: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-1">
+      <EditUserDialog
+        user={{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          position: user.position,
+        }}
+        isSelf={isSelf}
+      />
+      <ResetPasswordDialog
+        user={{
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          position: user.position,
+        }}
+      />
+      <UserActiveToggle
+        userId={user.id}
+        userName={user.name}
+        isActive={user.isActive}
+        isSelf={isSelf}
+      />
+    </div>
+  )
+}
 
 export default async function UsersPage() {
   // Enforced here, not only by hiding the menu item. Rendered as a refusal
@@ -33,87 +83,97 @@ export default async function UsersPage() {
   const users = await listUsers()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title="Pengguna"
-        description="Akun yang terdaftar beserta perannya di sistem."
+        description="Kelola akun, peran, dan akses masuk ke sistem."
+        actions={<CreateUserDialog />}
       />
 
       <Card className="py-0">
         <CardContent className="px-0">
-          {/* Card list below md. The table has six columns; on a phone that is
-              a sideways scroll nobody discovers, so the same rows are stacked
-              instead. Same pattern as ProjectTable and DocumentList. */}
-          <div className="divide-y md:hidden">
-            {users.map((user) => (
-              <article key={user.id} className="space-y-2 p-4">
+          {/* Card list below lg. Six columns plus three actions is a sideways
+              scroll nobody discovers on a phone. */}
+          <div className="divide-y lg:hidden">
+            {users.map((item) => (
+              <article key={item.id} className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold leading-snug text-brand-navy">
-                      {user.name}
+                      {item.name}
+                      {item.id === user.id ? (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          (Anda)
+                        </span>
+                      ) : null}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {user.email}
+                      {item.email}
                     </p>
                   </div>
                   <span className="shrink-0 rounded-md border bg-card px-2 py-0.5 text-xs font-medium whitespace-nowrap">
-                    {ROLE_LABELS[user.role]}
+                    {ROLE_LABELS[item.role]}
                   </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>{user.position ?? "Tanpa jabatan"}</span>
-                  <span className="tabular-nums">{user.projectCount} proyek</span>
-                  <span>{user.isActive ? "Aktif" : "Nonaktif"}</span>
+                  <span>{item.position ?? "Tanpa jabatan"}</span>
+                  <span className="tabular-nums">{item.projectCount} proyek</span>
+                  <StatusDot isActive={item.isActive} />
                 </div>
+
+                <RowActions user={item} isSelf={item.id === user.id} />
               </article>
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto lg:block">
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="bg-transparent">
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="min-w-48">Nama</TableHead>
                   <TableHead className="min-w-48">Email</TableHead>
                   <TableHead className="min-w-32">Peran</TableHead>
                   <TableHead className="min-w-40">Jabatan</TableHead>
-                  <TableHead className="min-w-24">Proyek</TableHead>
+                  <TableHead className="min-w-20">Proyek</TableHead>
                   <TableHead className="min-w-24">Status</TableHead>
+                  <TableHead className="min-w-64 text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="size-9">
-                          <AvatarFallback className="bg-brand-navy/9 text-xs font-semibold text-brand-navy">
-                            {initials(user.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-semibold text-brand-navy">{user.name}</span>
-                      </div>
+                {users.map((item) => (
+                  <TableRow
+                    key={item.id}
+                    className={cn(
+                      "border-0 hover:bg-muted/40",
+                      !item.isActive && "opacity-60"
+                    )}
+                  >
+                    <TableCell className="font-medium">
+                      {item.name}
+                      {item.id === user.id ? (
+                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                          (Anda)
+                        </span>
+                      ) : null}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {user.email}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="rounded-md font-medium">
-                        {ROLE_LABELS[user.role]}
-                      </Badge>
+                      {item.email}
                     </TableCell>
                     <TableCell className="text-sm">
-                      {user.position ?? "—"}
+                      {ROLE_LABELS[item.role]}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {item.position ?? "—"}
                     </TableCell>
                     <TableCell className="text-sm tabular-nums">
-                      {user.projectCount}
+                      {item.projectCount}
                     </TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-sm">
-                        <span className={user.isActive ? "size-2 rounded-full bg-success" : "size-2 rounded-full bg-muted-foreground"} />
-                        {user.isActive ? "Aktif" : "Nonaktif"}
-                      </span>
+                      <StatusDot isActive={item.isActive} />
+                    </TableCell>
+                    <TableCell>
+                      <RowActions user={item} isSelf={item.id === user.id} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -123,8 +183,10 @@ export default async function UsersPage() {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        Menambah dan menyunting pengguna belum tersedia pada tahap prototipe ini.
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        Pengguna tidak dapat dihapus permanen. Dokumen dan laporan progress
+        menunjuk ke penulisnya, jadi akun yang sudah tidak dipakai dinonaktifkan
+        agar riwayat proyek tetap utuh.
       </p>
     </div>
   )
