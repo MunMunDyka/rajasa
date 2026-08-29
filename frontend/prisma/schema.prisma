@@ -1,0 +1,323 @@
+// RKL ProjectHub - data model DRAFT for review.
+// Moves to frontend/prisma/schema.prisma once approved.
+//
+// Design rules applied here:
+//   - Nothing that can be derived is stored, EXCEPT two deliberate caches
+//     (Project.currentProgress, Project.lastProgressAt) so the project list can be
+//     sorted and filtered without aggregating every ProgressUpdate on every query.
+//   - Files are never deleted from disk by the app. Deletes are soft (deletedAt).
+//   - Users are never hard-deleted either; deactivate with isActive = false,
+//     so historical uploads and progress reports keep a real author.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7 no longer accepts connection URLs here. They live in two places:
+  //   migrations -> prisma.config.ts, which uses DIRECT_URL (session mode, :5432)
+  //   runtime    -> src/server/db/prisma.ts, which uses DATABASE_URL (pooler, :6543)
+  // Migrations cannot run through the transaction pooler, hence the split.
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN
+  CEO
+  ENGINEER
+  ACCOUNTANT
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+// PIC is the engineer shown in the "Engineer PIC" column. Exactly one per project.
+enum ProjectMemberRole {
+  PIC
+  MEMBER
+}
+
+// Decision D5. The whole permission model hangs off this field.
+enum FileKind {
+  PROJECT_DOCUMENT // contract, invoice, PO, report, permit. CEO / Accountant / Admin only.
+  PROGRESS_EVIDENCE // photo or PDF attached to a ProgressUpdate. Engineer uploads these.
+}
+
+enum CategoryGroup {
+  ENGINEERING
+  FINANCE
+  GENERAL
+}
+
+enum ActivityAction {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  MEMBER_ASSIGNED
+  MEMBER_REMOVED
+  PROGRESS_UPDATED
+  DOCUMENT_UPLOADED
+  DOCUMENT_UPDATED
+  DOCUMENT_DELETED
+  REQUIREMENT_ADDED
+  REQUIREMENT_FULFILLED
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole
+  position     String? // free text, e.g. "Marine Engineer", "Finance Staff"
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  // Marks the four seeded demo accounts. The topbar role switcher (D6) may only
+  // switch into a user with isDemo = true, so it can never impersonate a real account.
+  isDemo       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships       ProjectMember[]
+  progressUpdates   ProgressUpdate[]
+  uploadedDocuments Document[]       @relation("DocumentUploader")
+  deletedDocuments  Document[]       @relation("DocumentDeleter")
+  createdProjects   Project[]        @relation("ProjectCreator")
+  activities        ActivityLog[]
+
+  @@index([role])
+  @@index([isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Projects
+// ---------------------------------------------------------------------------
+
+model Project {
+  id          String        @id @default(cuid())
+  code        String        @unique // e.g. "RKL-2026-014"
+  name        String
+  description String?
+  status      ProjectStatus @default(PLANNING)
+
+  clientName    String?
+  location      String?
+  vesselName    String? // marine / logistics context, optional
+  contractValue Decimal? @db.Decimal(18, 2)
+
+  startDate   DateTime
+  targetDate  DateTime
+  completedAt DateTime?
+
+  // Cache of the latest ProgressUpdate. Written in the same transaction as the
+  // update, never edited directly. ProgressUpdate remains the source of truth.
+  currentProgress Int       @default(0) // 0..100
+  lastProgressAt  DateTime?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy       User                  @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members         ProjectMember[]
+  progressUpdates ProgressUpdate[]
+  documents       Document[]
+  requirements    DocumentRequirement[]
+  activities      ActivityLog[]
+
+  @@index([status])
+  @@index([targetDate])
+  @@index([lastProgressAt])
+}
+
+// "Delayed" is NOT a stored status (PLANNING section 14). It is derived:
+//   targetDate < now
+//   AND currentProgress < 100
+//   AND status NOT IN (COMPLETED, CANCELLED)
+// Keep that predicate in exactly one place: src/server/services/project-service.ts
+
+model ProjectMember {
+  id         String            @id @default(cuid())
+  projectId  String
+  userId     String
+  role       ProjectMemberRole @default(MEMBER)
+  assignedAt DateTime          @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Progress
+// ---------------------------------------------------------------------------
+
+model ProgressUpdate {
+  id        String @id @default(cuid())
+  projectId String
+  authorId  String
+
+  // Snapshot of the project progress before this update, so the timeline can
+  // render "50% -> 65%" without looking at the neighbouring row.
+  previousProgress Int
+  progress         Int // 0..100
+  description      String
+
+  reportedAt DateTime // date the work happened, chosen by the engineer
+  createdAt  DateTime @default(now())
+
+  project  Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author   User       @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  evidence Document[]
+
+  @@index([projectId, reportedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Documents
+// ---------------------------------------------------------------------------
+
+// Seeded from src/config/document-categories.ts, editable later in Settings.
+// Stored in the DB rather than hardcoded so PLANNING section 19 stays satisfied.
+model DocumentCategory {
+  id        String        @id @default(cuid())
+  key       String        @unique // "INVOICE", "PURCHASE_ORDER", "ENGINEERING"
+  label     String // "Invoice", "Purchase Order"
+  group     CategoryGroup @default(GENERAL)
+  sortOrder Int           @default(0)
+  isActive  Boolean       @default(true)
+
+  documents    Document[]
+  requirements DocumentRequirement[]
+
+  @@index([group, sortOrder])
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  projectId String
+  kind      FileKind
+
+  categoryId String
+
+  // Set only when kind = PROGRESS_EVIDENCE. Enforced in the service layer:
+  // a PROGRESS_EVIDENCE row must have progressUpdateId, a PROJECT_DOCUMENT must not.
+  progressUpdateId String?
+
+  name           String // display name entered by the uploader
+  description    String?
+  documentNumber String? // optional, e.g. invoice number
+  documentDate   DateTime? // optional, e.g. invoice date. Never required (section 21).
+
+  // Physical file. storageKey is generated (uuid + extension), never the user's
+  // filename, so the path cannot be guessed and cannot collide.
+  storageKey   String @unique // "2026/08/9f3c....pdf" relative to the uploads root
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  checksum     String? // sha256, for duplicate detection later
+
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  deletedAt   DateTime? // soft delete. Files stay on disk.
+  deletedById String?
+
+  project        Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category       DocumentCategory      @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  progressUpdate ProgressUpdate?       @relation(fields: [progressUpdateId], references: [id], onDelete: Cascade)
+  uploadedBy     User                  @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  deletedBy      User?                 @relation("DocumentDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+  fulfils        DocumentRequirement[]
+
+  @@index([projectId, kind, deletedAt])
+  @@index([categoryId])
+  @@index([progressUpdateId])
+}
+
+// ---------------------------------------------------------------------------
+// Document requirements - "Kelengkapan Dokumen" (PLANNING section 19b)
+// ---------------------------------------------------------------------------
+
+model DocumentRequirement {
+  id         String  @id @default(cuid())
+  projectId  String
+  categoryId String? // optional hint of which category should fulfil it
+
+  label       String // "Kontrak Kerja", "BAST", "Invoice Termin 1"
+  isMandatory Boolean   @default(true)
+  dueDate     DateTime?
+  notes       String?
+  sortOrder   Int       @default(0)
+
+  // Empty = Outstanding. Set = Fulfilled.
+  // Overdue is derived: dueDate < now AND fulfilledById IS NULL.
+  fulfilledById String?
+  fulfilledAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category    DocumentCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  fulfilledBy Document?         @relation(fields: [fulfilledById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, label])
+  @@index([projectId, isMandatory, fulfilledById])
+  @@index([dueDate])
+}
+
+// ---------------------------------------------------------------------------
+// Activity
+// ---------------------------------------------------------------------------
+
+model ActivityLog {
+  id        String  @id @default(cuid())
+  projectId String? // null for global actions such as creating a user
+  actorId   String
+
+  action ActivityAction
+  // Pre-rendered human sentence, e.g. "updated project progress 50% -> 65%".
+  // Written once so the feed never has to re-resolve deleted related rows.
+  summary String
+  // Structured detail for the UI, e.g. { "from": 50, "to": 65 }
+  metadata Json?
+
+  targetType String? // "Document" | "ProgressUpdate" | "DocumentRequirement" | "User"
+  targetId   String?
+
+  createdAt DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actor   User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+// Key/value so the app name (PLANNING section 2) and similar knobs are editable
+// from the Settings page without a redeploy.
+model AppSetting {
+  key       String   @id // "app.name", "app.logoUrl", "demo.enabled"
+  value     String
+  updatedAt DateTime @updatedAt
+}
