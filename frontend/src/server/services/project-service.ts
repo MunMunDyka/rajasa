@@ -286,16 +286,30 @@ export async function getAttentionProjects(viewer: Viewer): Promise<AttentionIte
 }
 
 /** One database read supplies all project-backed dashboard sections. */
-export async function getDashboardProjectData(viewer: Viewer): Promise<{
+/** How many rows the dashboard table shows before deferring to /projects. */
+export const DASHBOARD_PROJECT_LIMIT = 5
+
+export async function getDashboardProjectData(
+  viewer: Viewer,
+  filters: { status?: ProjectStatus; search?: string } = {}
+): Promise<{
   stats: ProjectStats
   projects: ProjectListItem[]
-  attention: AttentionItem[]
+  matchCount: number
+  filtered: boolean
 }> {
-  const projects = await listProjects(viewer)
+  // Counters always describe every project the viewer can see, never the
+  // filtered subset - otherwise filtering the table would silently rewrite the
+  // headline numbers above it.
+  const all = await listProjects(viewer)
+
+  const filtered = Boolean(filters.status || filters.search?.trim())
+  const matching = filtered ? await listProjects(viewer, filters) : all
 
   return {
-    stats: summarizeProjects(projects),
-    projects: projects.slice(0, 6),
-    attention: rankAttentionProjects(projects),
+    stats: summarizeProjects(all),
+    projects: matching.slice(0, DASHBOARD_PROJECT_LIMIT),
+    matchCount: matching.length,
+    filtered,
   }
 }

@@ -36,24 +36,24 @@ function SidebarWave() {
   return (
     <svg
       aria-hidden
-      viewBox="0 0 224 120"
+      viewBox="0 0 224 190"
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-44 w-full"
     >
       <path
         fill="var(--brand-maroon)"
-        opacity="0.09"
-        d="M0,58 C48,22 92,88 140,54 C178,27 204,58 224,44 L224,120 L0,120 Z"
+        opacity="0.10"
+        d="M0,74 C46,24 96,116 146,66 C184,28 206,66 224,50 L224,190 L0,190 Z"
       />
       <path
         fill="var(--brand-maroon)"
-        opacity="0.16"
-        d="M0,78 C44,44 94,100 144,71 C184,49 208,77 224,65 L224,120 L0,120 Z"
+        opacity="0.18"
+        d="M0,110 C44,62 98,150 148,100 C188,60 208,102 224,86 L224,190 L0,190 Z"
       />
       <path
         fill="var(--brand-maroon)"
-        opacity="0.26"
-        d="M0,97 C54,71 100,111 150,91 C190,75 210,95 224,87 L224,120 L0,120 Z"
+        opacity="0.30"
+        d="M0,146 C54,106 102,182 152,134 C192,96 212,138 224,122 L224,190 L0,190 Z"
       />
     </svg>
   )
@@ -132,14 +132,11 @@ export function AppSidebar({ role }: { role: UserRole }) {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="relative overflow-hidden border-t border-sidebar-border p-3 pt-10">
+      {/* Decoration only. The status chip that used to sit here said nothing a
+          user could act on, so it went; the wave now has the space to read as a
+          wave rather than a stripe. */}
+      <SidebarFooter className="relative h-40 overflow-hidden p-0">
         <SidebarWave />
-        <div className="relative flex items-center gap-2 rounded-md bg-card/80 px-2.5 py-2 backdrop-blur-[2px] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <span className="size-2 shrink-0 rounded-full bg-success" />
-          <p className="text-[11px] leading-tight text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
-            Sistem demo aktif
-          </p>
-        </div>
       </SidebarFooter>
     </Sidebar>
   )

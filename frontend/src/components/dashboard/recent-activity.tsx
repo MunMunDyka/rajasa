@@ -107,14 +107,17 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
                   key={item.id}
                   className="flex gap-3 py-3.5 first:pt-0 last:pb-0"
                 >
-                  <Avatar className="size-9 shrink-0">
+                  <Avatar className="size-8 shrink-0">
                     <AvatarFallback className="bg-brand-navy/9 text-[10px] font-semibold text-brand-navy">
                       {initials(item.actor.name)}
                     </AvatarFallback>
                   </Avatar>
 
                   <div className="min-w-0 flex-1 space-y-1">
-                    <p className="text-sm leading-snug">
+                    {/* break-words, not truncate: an activity line that gets
+                        cut off mid-sentence is useless, and this column gets
+                        narrow on a zoomed or small screen. */}
+                    <p className="text-sm leading-snug break-words">
                       <span className="font-medium">{item.actor.name}</span>{" "}
                       <span className="text-muted-foreground">
                         {item.summary}
@@ -127,7 +130,7 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
                         <Link
                           href={`/projects/${item.project.id}`}
                           className={cn(
-                            "inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground",
+                            "inline-flex min-w-0 max-w-full items-center gap-1 text-xs text-muted-foreground",
                             "hover:text-foreground hover:underline"
                           )}
                         >
@@ -147,8 +150,10 @@ export function RecentActivity({ items }: { items: ActivityItem[] }) {
         )}
       </CardContent>
 
+      {/* flex-wrap on the footer so the count drops to its own line instead of
+          colliding with the buttons when the column is narrow. */}
       {items.length > PAGE_SIZE ? (
-        <CardFooter className="justify-between border-t pt-4">
+        <CardFooter className="flex-wrap justify-between gap-2 border-t pt-4">
           <span className="text-xs tabular-nums text-muted-foreground">
             {start + 1}–{start + visible.length} dari {items.length}
           </span>
