@@ -38,6 +38,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MAX_UPLOAD_BYTES } from "@/config/app"
 import { formatCurrency, formatDate, formatRelative, initials } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import {
   canSeeFinancials,
   canUploadProjectDocument,
@@ -201,26 +202,32 @@ export default async function ProjectDetailPage({
       </section>
 
       <Tabs defaultValue="overview" className="gap-0">
-        <TabsList
-          variant="line"
-          className="w-full justify-between overflow-x-auto border-b bg-transparent p-0 sm:justify-start"
-        >
-          <TabsTrigger value="overview" className="h-11 px-2 text-xs sm:px-4 sm:text-sm">
-            <LayoutList className="hidden size-4 sm:block" />
-            Ringkasan
-          </TabsTrigger>
-          <TabsTrigger value="progress" className="h-11 px-2 text-xs sm:px-4 sm:text-sm">
-            <TrendingUp className="hidden size-4 sm:block" />
-            Progress
-          </TabsTrigger>
-          <TabsTrigger value="documents" className="h-11 px-2 text-xs sm:px-4 sm:text-sm">
-            <Files className="hidden size-4 sm:block" />
-            Dokumen
-          </TabsTrigger>
-          <TabsTrigger value="activity" className="h-11 px-2 text-xs sm:px-4 sm:text-sm">
-            <History className="hidden size-4 sm:block" />
-            Aktivitas
-          </TabsTrigger>
+        {/* Segmented control rather than an underline.
+            The underline variant marked the active tab with a 2px rule and a
+            slight change in text colour, which was easy to miss - especially on
+            the first visit, when nothing has been clicked yet. A filled pill
+            with white text on navy cannot be mistaken. */}
+        <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1">
+          {[
+            { value: "overview", label: "Ringkasan", icon: LayoutList },
+            { value: "progress", label: "Progress", icon: TrendingUp },
+            { value: "documents", label: "Dokumen", icon: Files },
+            { value: "activity", label: "Aktivitas", icon: History },
+          ].map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className={cn(
+                "h-9 flex-1 gap-1.5 rounded-md px-2 text-xs font-medium sm:px-4 sm:text-sm",
+                "text-muted-foreground hover:text-foreground",
+                "data-active:bg-brand-navy data-active:text-white data-active:shadow-sm",
+                "data-active:hover:text-white"
+              )}
+            >
+              <tab.icon className="hidden size-4 sm:block" />
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value="overview" className="mt-5 space-y-4">
