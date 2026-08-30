@@ -23,6 +23,10 @@ WEB_DIR="${APP_DIR}/frontend"
 cd "${APP_DIR}"
 
 echo "==> Menarik perubahan"
+# Discard any local change to the lockfile before pulling. npm install below
+# may rewrite it with Linux-specific optional packages, and a dirty lockfile
+# would make the next --ff-only pull refuse to run.
+git checkout -- frontend/package-lock.json 2>/dev/null || true
 git pull --ff-only
 
 cd "${WEB_DIR}"
@@ -33,9 +37,21 @@ if [ ! -f .env ]; then
 fi
 
 echo "==> Dependensi"
-# npm ci, not npm install: it installs exactly what package-lock.json pins, so
-# a deploy can never quietly pick up a different version than the one tested.
-npm ci
+# npm ci first: it installs exactly what package-lock.json pins, so a deploy
+# cannot quietly pick up a version that was never tested.
+#
+# It can legitimately fail here though. npm records platform-specific optional
+# packages for the machine that generated the lock, so a lockfile written on
+# Windows is missing the Linux-only variants (sharp pulls @emnapi/* on Linux).
+# npm ci refuses to resolve them rather than guessing - correct, but it means
+# a cross-platform lockfile needs npm install to fill the gaps.
+if ! npm ci --no-audit --no-fund; then
+  echo
+  echo "  npm ci menolak lockfile ini (kemungkinan dibuat di OS berbeda)."
+  echo "  Beralih ke npm install untuk melengkapi paket khusus Linux."
+  echo
+  npm install --no-audit --no-fund
+fi
 
 echo "==> Migrasi database"
 # migrate deploy, not migrate dev: it only applies existing migrations and will
