@@ -53,6 +53,15 @@ if ! npm ci --no-audit --no-fund; then
   npm install --no-audit --no-fund
 fi
 
+echo "==> Prisma Client"
+# Always generate, never assume. The client is written into node_modules, so it
+# is absent on a fresh install and stale after a schema change. npm only runs
+# the postinstall hook when it actually installs something - a deploy where
+# dependencies were already present skips it silently, and the build then fails
+# with "@prisma/client has no exported member", which reads like a code error
+# rather than a missing build step.
+npx prisma generate
+
 echo "==> Migrasi database"
 # migrate deploy, not migrate dev: it only applies existing migrations and will
 # never generate a new one or prompt to reset the database.
