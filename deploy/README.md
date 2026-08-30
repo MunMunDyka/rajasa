@@ -29,17 +29,35 @@ Subdomain gratis pun cukup.
 
 ## 1. Siapkan server
 
+Login sebagai user biasa (`ubuntu`, atau apa pun yang dipakai penyedia VPS-mu),
+lalu jalankan skrip setup dengan sudo:
+
 ```bash
-ssh root@<ip-vps>
-git clone https://github.com/MunMunDyka/rajasa.git /srv/rkl/app
-bash /srv/rkl/app/deploy/setup-server.sh
+ssh ubuntu@<ip-vps>
+sudo apt-get update && sudo apt-get install -y git
+sudo git clone https://github.com/MunMunDyka/rajasa.git /srv/rkl/app
+sudo bash /srv/rkl/app/deploy/setup-server.sh
 ```
 
-Skrip ini memasang Node, PM2, Nginx, Certbot dan PostgreSQL; membuat
-`/srv/rkl/{app,uploads,backups,logs}`; membuat database beserta usernya; mengunci
-Postgres agar hanya bisa diakses dari localhost; dan memasang cron backup harian.
+Skrip ini memasang Node, PM2, Nginx, Certbot dan PostgreSQL; membuat swap kalau
+RAM kecil; membuat `/srv/rkl/{app,uploads,backups,logs}` **dan menyerahkan
+kepemilikannya ke user yang menjalankan sudo**; membuat database beserta usernya;
+mengunci Postgres agar hanya bisa diakses dari localhost; dan memasang cron
+backup harian.
 
 **Simpan `DATABASE_URL` yang dicetaknya.** Hanya ditampilkan sekali.
+
+### Kenapa root hanya untuk setup
+
+Setup butuh root - memasang paket, membuat swap, mengatur Postgres. Tapi
+aplikasinya sendiri **berjalan sebagai user biasa**, dan `deploy.sh` menolak
+dijalankan dengan sudo.
+
+Dua alasannya. Pertama, proses web yang berjalan sebagai root mengubah bug
+eksekusi kode apa pun menjadi penguasaan penuh atas mesin. Kedua, PM2 melacak
+proses per user: kalau aplikasi pernah dijalankan sebagai root, deploy
+berikutnya sebagai user biasa tidak akan menemukannya, dan kamu berakhir dengan
+dua salinan memperebutkan port 3000.
 
 ---
 

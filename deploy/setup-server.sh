@@ -16,6 +16,21 @@ DB_NAME=rkl
 DB_USER=rkl
 NODE_MAJOR=22
 
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Jalankan dengan sudo:  sudo bash $0" >&2
+  exit 1
+fi
+
+# The account that will own the app and run PM2. Deploys and the Node process
+# run as this user, never as root: a web process with root privileges turns any
+# code-execution bug into a full machine compromise.
+APP_USER="${SUDO_USER:-ubuntu}"
+if ! id "${APP_USER}" >/dev/null 2>&1; then
+  echo "User ${APP_USER} tidak ada." >&2
+  exit 1
+fi
+echo "==> Aplikasi akan dimiliki dan dijalankan oleh: ${APP_USER}"
+
 echo "==> Paket sistem"
 apt-get update -qq
 apt-get install -y -qq \
@@ -62,6 +77,8 @@ echo "==> Struktur direktori"
 # uploads sits OUTSIDE the code directory on purpose: a deploy replaces app/,
 # and client documents must never be inside anything a deploy can overwrite.
 mkdir -p "${APP_ROOT}"/{app,uploads,backups,logs}
+# Owned by the app user so deploy.sh and PM2 need no privileges at all.
+chown -R "${APP_USER}:${APP_USER}" "${APP_ROOT}"
 
 echo "==> PostgreSQL"
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${DB_USER}'" | grep -q 1; then
@@ -107,8 +124,8 @@ if command -v ufw >/dev/null 2>&1; then
 fi
 
 echo
-echo "Selesai. Berikutnya:"
-echo "  1. git clone <repo> /srv/rkl/app"
-echo "  2. tulis /srv/rkl/app/frontend/.env (lihat deploy/README.md)"
+echo "Selesai. Berikutnya, SEBAGAI ${APP_USER} (tanpa sudo):"
+echo "  1. git clone https://github.com/MunMunDyka/rajasa.git /srv/rkl/app"
+echo "  2. nano /srv/rkl/app/frontend/.env      (lihat deploy/README.md)"
 echo "  3. bash /srv/rkl/app/deploy/deploy.sh"
-echo "  4. pasang nginx.conf, arahkan DNS, lalu certbot --nginx -d <domain>"
+echo "  4. sudo: pasang nginx.conf, lalu certbot --nginx -d <domain>"

@@ -8,6 +8,15 @@
 
 set -euo pipefail
 
+# Deliberately NOT run with sudo. PM2 tracks processes per user: start the app
+# as root once and every later deploy as the normal user will fail to find it,
+# leaving two copies fighting over port 3000. Running the web process as root
+# is also a bad idea in its own right.
+if [ "$(id -u)" -eq 0 ]; then
+  echo "Jangan jalankan dengan sudo. Jalankan sebagai pemilik /srv/rkl." >&2
+  exit 1
+fi
+
 APP_DIR=/srv/rkl/app
 WEB_DIR="${APP_DIR}/frontend"
 
