@@ -12,8 +12,13 @@ next-env.d.ts
 !.env.example
 
 # Uploaded files. Client documents belong on the server, not in git.
-storage/
-frontend/storage/
+#
+# The leading slash matters. Without it, "storage/" matches a directory of that
+# name at ANY depth - which silently swallowed frontend/src/server/storage/,
+# the file-storage service itself, and the omission only surfaced as a build
+# failure on a machine that had not seen the file before.
+/storage/
+/frontend/storage/
 
 # Logs and caches
 *.log
