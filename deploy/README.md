@@ -152,8 +152,20 @@ Tidak pernah menyentuh `/srv/rkl/uploads` maupun `.env`.
 
 ## Kalau bermasalah
 
-**Build kehabisan memori.** VPS 2 GB tidak cukup untuk `next build` sambil
-Postgres jalan. Naikkan ke 4 GB, atau tambah swap 2 GB sementara.
+**Build kehabisan memori (`Killed`, atau build berhenti tanpa pesan).**
+Swap belum aktif. Periksa:
+
+```bash
+free -m          # baris Swap harus bukan 0
+swapon --show
+```
+
+Kalau kosong, jalankan ulang `setup-server.sh` - ia membuat swap 4 GB saat RAM
+di bawah 3.5 GB. Kalau masih gagal, batasi heap Node saat build:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=1536 npm run build
+```
 
 **Login mengarah ke 127.0.0.1.** Header proxy di `nginx.conf` belum terpasang,
 atau `AUTH_URL` masih salah. Keduanya harus menunjuk domain asli.
