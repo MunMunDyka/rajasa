@@ -39,12 +39,27 @@ apt-get install -y -qq \
   nginx certbot python3-certbot-nginx \
   rsync cron
 
-echo "==> Node ${NODE_MAJOR}"
-if ! command -v node >/dev/null 2>&1; then
+echo "==> Node"
+# Never replace a Node that is already here. A VPS often runs more than one
+# app, and installing a different major version from NodeSource swaps the
+# global binary out from under whatever else is on the box. Anything from 20
+# up runs this project, so an existing newer Node is left exactly as it is.
+NODE_MIN_MAJOR=20
+if command -v node >/dev/null 2>&1; then
+  CURRENT_MAJOR="$(node -v | sed 's/^v\([0-9]*\).*//')"
+  if [ "${CURRENT_MAJOR}" -ge "${NODE_MIN_MAJOR}" ]; then
+    echo "  Node $(node -v) sudah ada dan memenuhi syarat - dilewati."
+  else
+    echo "  Node $(node -v) terlalu lama (minimal ${NODE_MIN_MAJOR})." >&2
+    echo "  Upgrade manual dulu, lalu jalankan skrip ini lagi." >&2
+    echo "  Tidak kuganti otomatis karena aplikasi lain di mesin ini mungkin bergantung padanya." >&2
+    exit 1
+  fi
+else
   curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
   apt-get install -y -qq nodejs
+  echo "  Node $(node -v) dipasang."
 fi
-node -v
 
 echo "==> PM2"
 command -v pm2 >/dev/null 2>&1 || npm install -g pm2
@@ -57,7 +72,11 @@ echo "==> Swap"
 # saat melayani permintaan.
 TOTAL_MB=$(free -m | awk '/^Mem:/{print $2}')
 SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
-if [ "${TOTAL_MB}" -lt 3500 ] && [ "${SWAP_MB}" -lt 1024 ]; then
+COMBINED=$((TOTAL_MB + SWAP_MB))
+# next build peaks near 2 GB on top of whatever else the box is running.
+# Judge on RAM + swap combined, not RAM alone: a machine with 2 GB of each has
+# room, one with 2 GB and no swap does not.
+if [ "${COMBINED}" -lt 5000 ]; then
   if [ ! -f /swapfile ]; then
     fallocate -l 4G /swapfile
     chmod 600 /swapfile
@@ -67,10 +86,13 @@ if [ "${TOTAL_MB}" -lt 3500 ] && [ "${SWAP_MB}" -lt 1024 ]; then
     # Pakai swap hanya saat benar-benar mendesak, bukan sebagai cadangan rutin.
     sysctl -qw vm.swappiness=10
     grep -q '^vm.swappiness' /etc/sysctl.conf || echo 'vm.swappiness=10' >> /etc/sysctl.conf
-    echo "  Swap 4 GB dibuat (RAM terdeteksi ${TOTAL_MB} MB)."
+    echo "  Swap 4 GB ditambahkan (RAM ${TOTAL_MB} MB + swap lama ${SWAP_MB} MB)."
+  else
+    echo "  /swapfile sudah ada; total RAM+swap ${COMBINED} MB."
+    echo "  Kalau build nanti mati dengan pesan 'Killed', besarkan swap ini."
   fi
 else
-  echo "  Tidak perlu (RAM ${TOTAL_MB} MB, swap ${SWAP_MB} MB)."
+  echo "  Cukup (RAM ${TOTAL_MB} MB + swap ${SWAP_MB} MB = ${COMBINED} MB)."
 fi
 
 echo "==> Struktur direktori"
