@@ -6,10 +6,19 @@ Sekali jalan penuh: sekitar 45 menit, sebagian besar menunggu DNS.
 ## Yang perlu disiapkan lebih dulu
 
 ```text
-VPS Ubuntu, 2 vCPU / 4 GB     jangan yang 2 GB - next build kehabisan memori
+VPS Ubuntu, 2 vCPU, RAM 2 GB atau lebih
 Akses root lewat SSH
 Sebuah domain atau subdomain   diarahkan ke IP VPS (A record)
 ```
+
+**Soal RAM 2 GB.** Cukup, asalkan ada swap. `next build` memuncak sekitar
+1.5-2 GB, dan tanpa swap prosesnya dibunuh OOM di tengah jalan sementara
+Postgres juga memegang memori. `setup-server.sh` membuat swap 4 GB otomatis
+kalau RAM di bawah 3.5 GB, jadi hal ini terurus sendiri.
+
+Runtime aplikasinya jauh lebih ringan - sekitar 250 MB untuk proses Node
+ditambah 150 MB untuk Postgres. Yang berat hanya saat build, dan build hanya
+sesekali.
 
 **Kenapa domain wajib:** HTTPS lewat Let's Encrypt hanya bisa untuk nama domain,
 tidak bisa untuk IP telanjang. Tanpa HTTPS, browser menandai halaman login

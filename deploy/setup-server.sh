@@ -34,6 +34,30 @@ node -v
 echo "==> PM2"
 command -v pm2 >/dev/null 2>&1 || npm install -g pm2
 
+echo "==> Swap"
+# next build memuncak sekitar 1.5-2 GB. Di VPS 2 GB, build akan dibunuh OOM
+# di tengah jalan sementara Postgres juga memegang memori. Swap menampung
+# puncak itu; ia lambat, tapi build hanya sesekali dan tidak perlu cepat.
+# Runtime aplikasinya sendiri hanya ~250 MB, jadi swap tidak akan terpakai
+# saat melayani permintaan.
+TOTAL_MB=$(free -m | awk '/^Mem:/{print $2}')
+SWAP_MB=$(free -m | awk '/^Swap:/{print $2}')
+if [ "${TOTAL_MB}" -lt 3500 ] && [ "${SWAP_MB}" -lt 1024 ]; then
+  if [ ! -f /swapfile ]; then
+    fallocate -l 4G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null
+    swapon /swapfile
+    grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    # Pakai swap hanya saat benar-benar mendesak, bukan sebagai cadangan rutin.
+    sysctl -qw vm.swappiness=10
+    grep -q '^vm.swappiness' /etc/sysctl.conf || echo 'vm.swappiness=10' >> /etc/sysctl.conf
+    echo "  Swap 4 GB dibuat (RAM terdeteksi ${TOTAL_MB} MB)."
+  fi
+else
+  echo "  Tidak perlu (RAM ${TOTAL_MB} MB, swap ${SWAP_MB} MB)."
+fi
+
 echo "==> Struktur direktori"
 # uploads sits OUTSIDE the code directory on purpose: a deploy replaces app/,
 # and client documents must never be inside anything a deploy can overwrite.
