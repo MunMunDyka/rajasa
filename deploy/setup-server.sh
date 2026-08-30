@@ -46,7 +46,10 @@ echo "==> Node"
 # up runs this project, so an existing newer Node is left exactly as it is.
 NODE_MIN_MAJOR=20
 if command -v node >/dev/null 2>&1; then
-  CURRENT_MAJOR="$(node -v | sed 's/^v\([0-9]*\).*//')"
+  # cut and tr rather than a sed capture group: no backslashes, so nothing
+  # can mangle the escape on its way into this file. `node -v` prints
+  # v24.16.0; strip the v, keep the first dot-separated field.
+  CURRENT_MAJOR="$(node -v | tr -d 'v' | cut -d. -f1)"
   if [ "${CURRENT_MAJOR}" -ge "${NODE_MIN_MAJOR}" ]; then
     echo "  Node $(node -v) sudah ada dan memenuhi syarat - dilewati."
   else
