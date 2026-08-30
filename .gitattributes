@@ -1,0 +1,18 @@
+# Normalise line endings in the repository regardless of anyone's
+# core.autocrlf setting.
+* text=auto eol=lf
+
+# These are executed by bash on Linux. Stored with CRLF they fail with
+# "bad interpreter: /bin/bash^M" or "$'\r': command not found", which is a
+# confusing way to lose an afternoon.
+*.sh            text eol=lf
+deploy/nginx.conf text eol=lf
+
+# Binary: never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.ico binary
+*.woff binary
+*.woff2 binary
