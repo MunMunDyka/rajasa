@@ -162,6 +162,25 @@ Login background served as a 115 KB WebP instead of the original 2.4 MB JPEG
 Measured warm /login response: about 105 ms in dev and 27 ms in production locally
 ```
 
+**Local resource and package-security audit (30 Aug 2026)**
+
+```text
+Application source is 0.4 MB; public assets are 2.6 MB
+One production Next server used about 124 MB RAM and answered /login in about 34 ms
+The observed 2-3 GB RAM use belonged to 17+ VS Code/Electron processes, not the app
+node_modules is 820 MB on disk; .next is 608 MB, of which .next/dev is 436 MB
+Windows Defender custom-scanned the full workspace and recorded zero threat detections
+Defender antivirus and real-time protection were enabled with signatures updated that day
+npm verified registry signatures for 835 installed packages; 243 had attestations
+Only expected native/build packages have install scripts: Prisma engines, Prisma,
+  esbuild, fsevents, and unrs-resolver
+```
+
+Resource decision: keep Next.js. Use one production server for demos, keep one VS Code
+workspace open, inspect/disable unnecessary extensions, and clear generated `.next/dev`
+and `.next/cache` only while the server is stopped. Do not disable Defender or exclude
+the whole repository from scanning.
+
 **Project document upload MVP**
 
 ```text
@@ -184,6 +203,8 @@ Anonymous access        every app route redirects to /login
 Bad ids                 404, indistinguishable from "not yours"
 Document upload         CEO upload 201, appears in project, protected PDF preview 200
 Engineer upload         rejected 403 before a file is written
+Defender custom scan    completed against the workspace; zero threat detections
+npm package signatures  835 verified; 243 packages also carry attestations
 tsc, eslint, next build all clean
 ```
 
@@ -228,10 +249,14 @@ Projects can be created, but not edited afterwards, and members cannot be
   added or removed once the project exists - only the PIC named at creation.
 Settings is a read-only listing; the app name and document categories
   cannot be edited yet.
+npm audit reports one Prisma CLI/config advisory chain as three high entries:
+  prisma 7.10.0 -> @prisma/config 7.10.0 -> deepmerge-ts 7.1.5.
+  It is a recursive-object stack exhaustion issue, not a malware detection.
+  Do not run npm audit fix --force: its proposed Prisma 6.12 downgrade is a
+  breaking major change. Monitor Prisma stable releases for the patched chain.
 DEMO_MODE must be "true" for the role switcher, the demo account hints
   and npm run db:seed. Next reads .env only at startup, so changing it
   requires a dev server restart - it is not picked up by hot reload.
-public/brand/background.jpg is 2.4 MB; compress it before go-live.
 ```
 
 ---

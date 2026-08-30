@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   title: "Masuk",
 }
 
+const LOGIN_BACKGROUND_ZOOM = 1.5
+
 function BrandLockup() {
   return (
     <div className="flex flex-col items-center text-center">
@@ -41,18 +43,12 @@ export default function LoginPage() {
           priority
           sizes="56vw"
           className="object-cover object-center"
+          style={{ transform: `scale(${LOGIN_BACKGROUND_ZOOM})` }}
         />
         <div className="absolute inset-0 bg-brand-navy/72" />
         <div className="absolute inset-y-0 right-0 w-1 bg-brand-maroon" />
 
-        <div className="relative flex h-full min-h-screen flex-col justify-between p-10 xl:p-14">
-          <div className="flex items-center gap-3 text-white">
-            <span className="flex size-10 items-center justify-center rounded-md bg-brand-maroon text-xs font-bold">
-              RKL
-            </span>
-            <span className="text-sm font-medium text-white/75">{COMPANY_NAME}</span>
-          </div>
-
+        <div className="relative flex h-full min-h-screen flex-col justify-end p-10 xl:p-14">
           <div className="max-w-xl pb-[8vh]">
             <p className="text-sm font-semibold text-white/65">Ruang kerja internal</p>
             <h1 className="mt-3 text-4xl leading-tight font-semibold text-white xl:text-5xl">
@@ -69,14 +65,9 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-[25rem]">
           <BrandLockup />
 
-          <div className="mt-9 mb-5">
-            <h2 className="text-lg font-semibold text-brand-navy">Masuk ke portal</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Gunakan akun RKL yang telah terdaftar.
-            </p>
+          <div className="mt-10">
+            <LoginForm showDemoAccounts={DEMO_MODE} />
           </div>
-
-          <LoginForm showDemoAccounts={DEMO_MODE} />
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
             {COMPANY_NAME}
